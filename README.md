@@ -19,7 +19,7 @@ Lightweight repository scanner for detecting package managers and extracting bas
 
 - Initialize module (recommended):
   ```sh
-  go mod init github.com/yourname/sca-cli
+  go mod init github.com/joshdotcc/sca-cli
   go build -o sca-cli .
   ```
 
