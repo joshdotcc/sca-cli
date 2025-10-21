@@ -436,3 +436,95 @@ func parseGradleDeps(path string) []string {
 
 	return setToSortedSlice(deps)
 }
+
+/************************************
+* Function Name: parseCargoTomlDeps
+* Purpose: Extract dependency names and versions from the [dependencies] section of a Cargo.toml file.
+* Parameters: path string
+* Output: []string (format: name@version)
+*************************************/
+func parseCargoTomlDeps(path string) []string {
+	s, err := readFileContent(path)
+	if err != nil {
+		return nil
+	}
+	deps := []string{}
+	lines := strings.Split(s, "\n")
+	inDependencies := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // Skip empty lines and comments
+		}
+
+		// Detect [dependencies] section
+		if strings.EqualFold(line, "[dependencies]") {
+			inDependencies = true
+			continue
+		}
+
+		if inDependencies {
+			if strings.HasPrefix(line, "[") { // End of [dependencies] section
+				break
+			}
+
+			// Match dependencies in the form: name = { ... }
+			if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
+				name := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				if strings.HasPrefix(value, "{") { // Handle metadata
+					if strings.Contains(value, "version") {
+						re := regexp.MustCompile(`version\s*=\s*\"([^\"]+)\"`)
+						if match := re.FindStringSubmatch(value); len(match) > 1 {
+							deps = append(deps, fmt.Sprintf("%s@%s", name, match[1]))
+							continue
+						}
+					}
+					// If no version, include the dependency name only
+					deps = append(deps, name)
+				} else { // Handle simple dependencies
+					version := strings.Trim(value, "\"")
+					deps = append(deps, fmt.Sprintf("%s@%s", name, version))
+				}
+			}
+		}
+	}
+
+	return deps
+}
+
+/************************************
+* Function Name: parseRequirementsTxtDeps
+* Purpose: Extract dependency names and versions from a requirements.txt file.
+*          This parser ignores hashes and focuses on name==version or name version.
+* Parameters: path string
+* Output: []string (format: name@version)
+*************************************/
+func parseRequirementsTxtDeps(path string) []string {
+	s, err := readFileContent(path)
+	if err != nil {
+		return nil
+	}
+	deps := []string{}
+	lines := strings.Split(s, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // Skip empty lines and comments
+		}
+
+		// Extract dependency name and version by splitting on '=='
+		if strings.Contains(line, "==") {
+			parts := strings.SplitN(line, "==", 2)
+			if len(parts) == 2 {
+				dep := fmt.Sprintf("%s==%s", strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+				deps = append(deps, dep)
+			}
+		}
+	}
+
+	return deps
+}

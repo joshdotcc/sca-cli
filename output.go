@@ -93,6 +93,21 @@ func analyzeRepository(repoURL, root string, managers map[string][]string) Analy
 				}
 				perFile[rel] = parseGradleDeps(p)
 			}
+		case "rust":
+			perFile := map[string][]string{}
+			for _, p := range paths {
+				deps := parseCargoTomlDeps(p)
+				if len(deps) > 0 {
+					rel, err := filepath.Rel(root, p)
+					if err != nil {
+						rel = p
+					}
+					perFile[rel] = deps
+				}
+			}
+			if len(perFile) > 0 {
+				a.Dependencies[eco] = perFile
+			}
 		default:
 			for _, p := range paths {
 				rel, err := filepath.Rel(root, p)
@@ -102,7 +117,12 @@ func analyzeRepository(repoURL, root string, managers map[string][]string) Analy
 				perFile[rel] = []string{}
 			}
 		}
-		a.Dependencies[eco] = perFile
+		if _, exists := a.Dependencies[eco]; !exists {
+			a.Dependencies[eco] = map[string][]string{}
+		}
+		for file, deps := range perFile {
+			a.Dependencies[eco][file] = deps
+		}
 	}
 
 	return a
@@ -126,11 +146,12 @@ func printDivider() {
 }
 
 func printDependencies(m map[string]map[string][]string) {
-	// ecosystems
 	ecos := make([]string, 0, len(m))
 	for k := range m {
 		ecos = append(ecos, k)
 	}
+	
+	fmt.Println(ecos)
 	sort.Strings(ecos)
 	if len(ecos) == 0 {
 		fmt.Println("  (none)")
@@ -150,25 +171,9 @@ func printDependencies(m map[string]map[string][]string) {
 				fmt.Println("    (none)")
 				continue
 			}
-			// determine name width for this file
-			maxName := 0
-			parsed := make([][2]string, 0, len(deps))
-			for _, dv := range deps {
-				parts := strings.SplitN(dv, "@", 2)
-				name := parts[0]
-				ver := ""
-				if len(parts) > 1 {
-					ver = parts[1]
-				}
-				parsed = append(parsed, [2]string{name, ver})
-				if len(name) > maxName {
-					maxName = len(name)
-				}
+			for _, dep := range deps {
+				fmt.Printf("    - %s\n", dep)
 			}
-			for _, nv := range parsed {
-				fmt.Printf("    - %-*s  @  %s\n", maxName, nv[0], nv[1])
-			}
-			fmt.Println()
 		}
 	}
 }
