@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,7 +51,10 @@ func detectPackageManagers(root string) (map[string][]string, error) {
 			found["node/npm"] = append(found["node/npm"], path)
 		case "yarn.lock":
 			found["node/yarn"] = append(found["node/yarn"], path)
-		case "requirements.txt", "setup.py", "pipfile", "pyproject.toml":
+		case "requirements.txt":
+			fmt.Printf("Detected requirements.txt at: %s\n", path) // Debug log
+			found["python"] = append(found["python"], path)
+		case "setup.py", "pipfile", "pyproject.toml":
 			found["python"] = append(found["python"], path)
 		case "pom.xml":
 			found["maven"] = append(found["maven"], path)

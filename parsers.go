@@ -520,8 +520,105 @@ func parseRequirementsTxtDeps(path string) []string {
 		if strings.Contains(line, "==") {
 			parts := strings.SplitN(line, "==", 2)
 			if len(parts) == 2 {
-				dep := fmt.Sprintf("%s==%s", strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
-				deps = append(deps, dep)
+				name := strings.TrimSpace(parts[0])
+				version := strings.Fields(parts[1])[0] // Ensure no extra characters
+				deps = append(deps, fmt.Sprintf("%s@%s", name, version))
+			}
+		}
+	}
+
+	return deps
+}
+
+/************************************
+* Function Name: parseSetupPyDeps
+* Purpose: Extract dependencies from setup.py files, focusing on the install_requires list.
+* Parameters: path string
+* Output: []string (format: name@version)
+*************************************/
+func parseSetupPyDeps(path string) []string {
+	s, err := readFileContent(path)
+	if err != nil {
+		return nil
+	}
+	deps := []string{}
+
+	// Match the install_requires list
+	re := regexp.MustCompile(`(?s)install_requires\s*=\s*\[(.*?)\]`)
+	if matches := re.FindStringSubmatch(s); len(matches) > 1 {
+		listContent := matches[1]
+		// Split dependencies by commas and process each
+		items := strings.Split(listContent, ",")
+		for _, item := range items {
+			item = strings.TrimSpace(item)
+			item = strings.Trim(item, "'\"") // Remove quotes
+			if strings.Contains(item, "==") {
+				parts := strings.SplitN(item, "==", 2)
+				if len(parts) == 2 {
+					name := strings.TrimSpace(parts[0])
+					version := strings.TrimSpace(parts[1])
+					deps = append(deps, fmt.Sprintf("%s@%s", name, version))
+				}
+			} else if item != "" {
+				deps = append(deps, item) // Add dependencies without version
+			}
+		}
+	}
+
+	return deps
+}
+
+/************************************
+* Function Name: parsePackageSwiftDeps
+* Purpose: Extract dependencies from the dependencies array in Package.swift files.
+* Parameters: path string
+* Output: []string (format: name@version)
+*************************************/
+func parsePackageSwiftDeps(path string) []string {
+	s, err := readFileContent(path)
+	if err != nil {
+		return nil
+	}
+	deps := []string{}
+
+	// Match dependencies in the dependencies array
+	re := regexp.MustCompile(`\.package\(name:\s*\"([^"]+)\".*?\)`) // Match .package(name: "...")
+	for _, match := range re.FindAllStringSubmatch(s, -1) {
+		if len(match) > 1 {
+			deps = append(deps, match[1])
+		}
+	}
+
+	return deps
+}
+
+/************************************
+* Function Name: parseGemfileDeps
+* Purpose: Extract dependencies from Gemfile files, focusing on the gem keyword.
+* Parameters: path string
+* Output: []string (format: name@version)
+*************************************/
+func parseGemfileDeps(path string) []string {
+	s, err := readFileContent(path)
+	if err != nil {
+		return nil
+	}
+	deps := []string{}
+
+	// Match dependencies specified with the gem keyword
+	re := regexp.MustCompile(`gem\s+['\"]([^'\"]+)['\"](?:,\s*['\"]([^'\"]+)['\"])?`)
+	for _, match := range re.FindAllStringSubmatch(s, -1) {
+		if len(match) > 1 {
+			name := match[1]
+			version := ""
+			if len(match) > 2 {
+				version = strings.TrimPrefix(match[2], "~>") // Trim '~>'
+				version = strings.TrimSpace(version)
+			}
+			if version != "" {
+				deps = append(deps, fmt.Sprintf("%s@%s", name, version))
+			} else {
+				deps = append(deps, name)
 			}
 		}
 	}

@@ -108,6 +108,34 @@ func analyzeRepository(repoURL, root string, managers map[string][]string) Analy
 			if len(perFile) > 0 {
 				a.Dependencies[eco] = perFile
 			}
+		case "python":
+			for _, p := range paths {
+				rel, err := filepath.Rel(root, p)
+				if err != nil {
+					rel = p
+				}
+				if strings.HasSuffix(p, "setup.py") {
+					perFile[rel] = parseSetupPyDeps(p)
+				} else {
+					perFile[rel] = parseRequirementsTxtDeps(p)
+				}
+			}
+		case "swift":
+			for _, p := range paths {
+				rel, err := filepath.Rel(root, p)
+				if err != nil {
+					rel = p
+				}
+				perFile[rel] = parsePackageSwiftDeps(p)
+			}
+		case "ruby":
+			for _, p := range paths {
+				rel, err := filepath.Rel(root, p)
+				if err != nil {
+					rel = p
+				}
+				perFile[rel] = parseGemfileDeps(p)
+			}
 		default:
 			for _, p := range paths {
 				rel, err := filepath.Rel(root, p)
