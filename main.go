@@ -237,6 +237,15 @@ func analyzeRepository(repoURL, root string, managers map[string][]string) Analy
 			}
 			list := setToSortedSlice(set)
 			a.Dependencies[niceName(k)] = list
+		case "maven":
+			set := map[string]struct{}{}
+			for _, p := range paths {
+				for _, d := range parsePomDeps(p) {
+					set[d] = struct{}{}
+				}
+			}
+			list := setToSortedSlice(set)
+			a.Dependencies[niceName(k)] = list
 		default:
 			// other ecosystems: leave empty for now
 			a.Dependencies[niceName(k)] = []string{}
@@ -359,6 +368,54 @@ func parsePackageJSONDeps(path string) []string {
 		}
 	}
 	return setToSortedSlice(set)
+}
+
+/************************************
+* Function Name: parsePomDeps
+* Purpose: Extract dependencies from a pom.xml file as group:artifact@version (version optional).
+* Parameters: path string
+* Output: []string
+*************************************/
+func parsePomDeps(path string) []string {
+	s, err := readFileContent(path)
+	if err != nil {
+		return nil
+	}
+	deps := map[string]struct{}{}
+
+	// find dependency blocks
+	reDep := regexp.MustCompile(`(?s)<dependency>(.*?)</dependency>`)
+	reGroup := regexp.MustCompile(`<groupId>\s*([^<\s]+)\s*</groupId>`)
+	reArtifact := regexp.MustCompile(`<artifactId>\s*([^<\s]+)\s*</artifactId>`)
+	reVersion := regexp.MustCompile(`<version>\s*([^<\s]+)\s*</version>`)
+
+	for _, m := range reDep.FindAllStringSubmatch(s, -1) {
+		block := m[1]
+		g := ""
+		a := ""
+		v := ""
+		if gm := reGroup.FindStringSubmatch(block); len(gm) > 1 {
+			g = strings.TrimSpace(gm[1])
+		}
+		if am := reArtifact.FindStringSubmatch(block); len(am) > 1 {
+			a = strings.TrimSpace(am[1])
+		}
+		if vm := reVersion.FindStringSubmatch(block); len(vm) > 1 {
+			v = strings.TrimSpace(vm[1])
+		}
+		if g == "" && a == "" {
+			continue
+		}
+		var key string
+		if v != "" {
+			key = fmt.Sprintf("%s:%s@%s", g, a, v)
+		} else {
+			key = fmt.Sprintf("%s:%s", g, a)
+		}
+		deps[key] = struct{}{}
+	}
+
+	return setToSortedSlice(deps)
 }
 
 /************************************
