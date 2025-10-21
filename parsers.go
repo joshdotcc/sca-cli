@@ -63,33 +63,89 @@ func niceName(key string) string {
 /************************************
 * Function Name: parseGoModDeps
 * Purpose: Extract module dependency names and versions from a go.mod file.
+*          This is a conservative line-based parser that handles 'require' blocks,
+*          single-line requires, comments (//), and simple replace directives.
 * Parameters: path string
-* Output: []string (format: name@version)
+* Output: []string (format: module@version or module => replacement)
 *************************************/
 func parseGoModDeps(path string) []string {
-	s, err := readFileContent(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
+	text := string(b)
+	lines := strings.Split(text, "\n")
+	inBlock := false
 	deps := map[string]struct{}{}
 
-	// match single-line require: require github.com/foo v1.2.3
-	re1 := regexp.MustCompile(`(?m)^\s*require\s+([^\s]+)\s+([^\s]+)`) 
-	for _, m := range re1.FindAllStringSubmatch(s, -1) {
-		name := m[1]
-		ver := m[2]
-		deps[fmt.Sprintf("%s@%s", name, ver)] = struct{}{}
-	}
+	for _, raw := range lines {
+		ln := strings.TrimSpace(raw)
+		if ln == "" {
+			continue
+		}
+		// strip inline comments
+		if idx := strings.Index(ln, "//"); idx != -1 {
+			ln = strings.TrimSpace(ln[:idx])
+			if ln == "" {
+				continue
+			}
+		}
 
-	// match block require: require ( ... )
-	reBlock := regexp.MustCompile(`(?s)require\s*\((.*?)\)`) 
-	for _, bm := range reBlock.FindAllStringSubmatch(s, -1) {
-		inner := bm[1]
-		reLine := regexp.MustCompile(`([^\s]+)\s+([^\s]+)`) 
-		for _, lm := range reLine.FindAllStringSubmatch(inner, -1) {
-			name := lm[1]
-			ver := lm[2]
-			deps[fmt.Sprintf("%s@%s", name, ver)] = struct{}{}
+		// handle block start
+		if strings.HasPrefix(ln, "require (") || ln == "require(" {
+			inBlock = true
+			continue
+		}
+		// handle block end
+		if inBlock {
+			if strings.HasPrefix(ln, ")") {
+				inBlock = false
+				continue
+			}
+			// expect: module version
+			parts := strings.Fields(ln)
+			if len(parts) >= 2 {
+				name := parts[0]
+				ver := parts[1]
+				deps[fmt.Sprintf("%s@%s", name, ver)] = struct{}{}
+			}
+			continue
+		}
+
+		// single-line require: require module version
+		if strings.HasPrefix(ln, "require ") {
+			rest := strings.TrimSpace(strings.TrimPrefix(ln, "require"))
+			// rest may be '( ' which we handled, otherwise module version
+			parts := strings.Fields(rest)
+			if len(parts) >= 2 {
+				name := parts[0]
+				ver := parts[1]
+				deps[fmt.Sprintf("%s@%s", name, ver)] = struct{}{}
+			}
+			continue
+		}
+
+		// replace directives: support 'replace old => new' or 'replace old new'
+		if strings.HasPrefix(ln, "replace ") {
+			rest := strings.TrimSpace(strings.TrimPrefix(ln, "replace"))
+			if strings.Contains(rest, "=>") {
+				sides := strings.SplitN(rest, "=>", 2)
+				left := strings.Fields(strings.TrimSpace(sides[0]))
+				right := strings.Fields(strings.TrimSpace(sides[1]))
+				if len(left) > 0 && len(right) > 0 {
+					from := left[0]
+					to := right[0]
+					deps[fmt.Sprintf("%s => %s", from, to)] = struct{}{}
+				}
+			} else {
+				parts := strings.Fields(rest)
+				if len(parts) >= 2 {
+					from := parts[0]
+					to := parts[1]
+					deps[fmt.Sprintf("%s => %s", from, to)] = struct{}{}
+				}
+			}
+			continue
 		}
 	}
 
