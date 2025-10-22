@@ -208,7 +208,7 @@ func parsePomProperties(path string) map[string]string {
 		return props
 	}
 	// extract properties block
-	reProps := regexp.MustCompile(`(?s)<properties>(.*?)</properties>`) 
+	reProps := regexp.MustCompile(`(?s)<properties>(.*?)</properties>`)
 	if m := reProps.FindStringSubmatch(s); len(m) > 1 {
 		inner := m[1]
 		// capture each <name>value</name> inside properties
@@ -235,7 +235,7 @@ func parsePomDependencyManagement(path string) map[string]string {
 		return mmap
 	}
 	// find dependencyManagement block
-	reDM := regexp.MustCompile(`(?s)<dependencyManagement>(.*?)</dependencyManagement>`) 
+	reDM := regexp.MustCompile(`(?s)<dependencyManagement>(.*?)</dependencyManagement>`)
 	if m := reDM.FindStringSubmatch(s); len(m) > 1 {
 		inner := m[1]
 		// find dependency blocks inside

@@ -21,7 +21,7 @@ func main() {
 	flag.StringVar(&targetDir, "dir", "./repo", "target directory for the repository")
 	flag.BoolVar(&skipCloneFlag, "skip-clone", false, "skip cloning and analyze existing directory")
 	flag.StringVar(&outputFmt, "output", "cli", "output format: cli or json")
-	flag.StringVar(&outputFile, "o", "", "filepath to write JSON output (implies JSON)")
+	flag.StringVar(&outputFile, "o", "", "filepath to write JSON output (must end in .json)")
 	flag.Parse()
 
 	// allow positional first arg as repo URL
@@ -45,8 +45,14 @@ func main() {
 		}
 	}
 
+	// Validate output file extension
+	if outputFile != "" && !strings.HasSuffix(strings.ToLower(outputFile), ".json") {
+		fmt.Println("Error: Output file must have .json extension")
+		os.Exit(1)
+	}
+
 	if repoURL == "" && (targetDir == "" || !pathExists(targetDir)) {
-		fmt.Println("Usage: sca-cli <git-url> [-dir <path>] [-o filepath] or point -dir to an existing checkout")
+		fmt.Println("Usage: sca-cli <git-url> [-dir <path>] [-o filepath.json] or point -dir to an existing checkout")
 		os.Exit(1)
 	}
 

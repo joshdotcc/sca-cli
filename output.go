@@ -178,7 +178,7 @@ func printDependencies(m map[string]map[string][]string) {
 	for k := range m {
 		ecos = append(ecos, k)
 	}
-	
+
 	fmt.Println(ecos)
 	sort.Strings(ecos)
 	if len(ecos) == 0 {
@@ -208,5 +208,5 @@ func printDependencies(m map[string]map[string][]string) {
 
 func printFooter() {
 	fmt.Println(strings.Repeat("=", 60))
-	fmt.Println("Scan complete.\n")
+	fmt.Println("Scan complete.")
 }
